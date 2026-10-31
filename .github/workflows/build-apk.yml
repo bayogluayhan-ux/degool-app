@@ -11,33 +11,105 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
         with:
-          node-version: 18
-
-      - name: Set up Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
 
-      - name: Install Capacitor & Build App
+      - name: Setup Android SDK & Project Structure
         run: |
-          mkdir -p www
-          cp index.html www/
-          npm install -g @capacitor/cli
-          npm install @capacitor/core @capacitor/android
-          npx cap init "degooL" "com.degool.tahmin" --web-dir www
-          npx cap add android
+          mkdir -p android/app/src/main/assets
+          mkdir -p android/app/src/main/java/com/degool/tahmin
+          cp index.html android/app/src/main/assets/
+
+          # Root build.gradle
+          cat << 'EOF' > android/build.gradle
+          buildscript {
+              repositories { google(); mavenCentral() }
+              dependencies { classpath 'com.android.tools.build:gradle:8.1.1' }
+          }
+          allprojects { repositories { google(); mavenCentral() } }
+          EOF
+
+          # settings.gradle
+          echo "include ':app'" > android/settings.gradle
+
+          # App build.gradle
+          cat << 'EOF' > android/app/build.gradle
+          plugins { id 'com.android.application' }
+          android {
+              namespace 'com.degool.tahmin'
+              compileSdk 33
+              defaultConfig {
+                  applicationId "com.degool.tahmin"
+                  minSdk 21
+                  targetSdk 33
+                  versionCode 1
+                  versionName "1.0"
+              }
+          }
+          EOF
+
+          # AndroidManifest.xml
+          cat << 'EOF' > android/app/src/main/AndroidManifest.xml
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <application
+                  android:allowBackup="true"
+                  android:icon="@mipmap/ic_launcher"
+                  android:label="degooL"
+                  android:supportsRtl="true"
+                  android:theme="@android:style/Theme.NoTitleBar">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          # MainActivity.java
+          cat << 'EOF' > android/app/src/main/java/com/degool/tahmin/MainActivity.java
+          package com.degool.tahmin;
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+
+          public class MainActivity extends Activity {
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  WebView webView = new WebView(this);
+                  WebSettings settings = webView.getSettings();
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+                  webView.loadUrl("file:///android_asset/index.html");
+                  setContentView(webView);
+              }
+          }
+          EOF
+
+      - name: Setup Gradle Wrapper
+        run: |
           cd android
-          chmod +x gradlew
+          gradle wrapper --gradle-version 8.0
+
+      - name: Build Debug APK
+        run: |
+          cd android
           ./gradlew assembleDebug
 
       - name: Upload APK Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: degool-app-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          
