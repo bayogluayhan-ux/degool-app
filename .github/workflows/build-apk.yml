@@ -1,0 +1,13 @@
+name: Build APK
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build Android APK
+        uses: AndroidGlitch/HTML-To-APK@v1
+        with:
+          app-name: 'degooL'
+          package-name: 'com.degool.tahmin'
+          icon: 'logo.png' # Logoyu da yükleyebilirsiniz
